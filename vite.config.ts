@@ -9,5 +9,18 @@ export default defineConfig({
   },
   build: {
     chunkSizeWarningLimit: 4096,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ['react', 'react-dom', 'react-router-dom'],
+          editor: [
+            '@uiw/react-codemirror',
+            '@codemirror/lang-javascript',
+            '@codemirror/lang-html',
+            '@codemirror/theme-one-dark',
+          ],
+        },
+      },
+    },
   },
 });

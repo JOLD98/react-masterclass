@@ -65,8 +65,23 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
   const [celebration, setCelebration] = useState<string | null>(null);
 
   // Changement d'utilisateur : rechargement de sa progression
+  // (avec migration de la progression invité si le nouveau compte est vide)
   useEffect(() => {
-    if (state.key !== authKey) setState({ key: authKey, data: load(authKey, emptyProgress()) });
+    if (state.key !== authKey) {
+      let data = load(authKey, emptyProgress());
+      const guestToUser = state.key === 'progress:guest' && authKey !== 'progress:guest';
+      if (guestToUser) {
+        const guest = state.data;
+        const guestHasData = guest.completedLessons.length > 0 || guest.xp > 0 || Object.keys(guest.exercises).length > 0;
+        const userHasData = data.completedLessons.length > 0 || data.xp > 0;
+        if (guestHasData && !userHasData) {
+          data = guest;
+          save(authKey, guest);
+        }
+      }
+      setState({ key: authKey, data });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authKey, state.key]);
 
   // Sauvegarde automatique

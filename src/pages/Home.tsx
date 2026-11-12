@@ -34,7 +34,7 @@ function Atom() {
       <div className="atom-card">
         <span className="dot" />
         <span>
-          <strong>141 leçons</strong> · exercices corrigés en direct
+          <strong>{totalLessons > 0 ? totalLessons : '141'} leçons</strong> · exercices corrigés en direct
         </span>
       </div>
     </div>

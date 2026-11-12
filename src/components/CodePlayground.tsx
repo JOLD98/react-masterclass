@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import * as Babel from '@babel/standalone';
 import { CodeEditor } from './CodeEditor';
 
 export interface RunLog {
@@ -27,13 +26,21 @@ interface Props {
 
 let runSeq = 0;
 
+// Babel (~3 Mo) est chargé à la demande uniquement lors d'une compilation JSX
+type BabelModule = typeof import('@babel/standalone');
+let babelPromise: Promise<BabelModule> | null = null;
+function loadBabel(): Promise<BabelModule> {
+  if (!babelPromise) babelPromise = import('@babel/standalone');
+  return babelPromise;
+}
+
 /** Détecte un document HTML complet (exercices des modules bases web) */
 function looksHtml(code: string): boolean {
   return /^\s*<!doctype\s+html|^\s*<html[\s>]/i.test(code);
 }
 
 /** Construit le document HTML exécuté dans l'iframe isolée */
-function buildDoc(code: string, language: 'js' | 'jsx' | 'html', id: string): string {
+async function buildDoc(code: string, language: 'js' | 'jsx' | 'html', id: string): Promise<string> {
   // ---------- HTML : rendu direct du document ----------
   if (language === 'html' || looksHtml(code)) {
     const bridge = `<script>(function(){var id=${JSON.stringify(id)};function fmt(v){try{if(typeof v==='string')return v;if(v instanceof Error)return v.message;if(typeof v==='object'&&v!==null)return JSON.stringify(v);return String(v);}catch(e){return String(v);}}function send(level,args){try{parent.postMessage({__rm:true,id:id,level:level,text:Array.prototype.map.call(args,fmt).join(' ')},'*');}catch(e){}}['log','info','warn','error'].forEach(function(level){var o=console[level];console[level]=function(){send(level==='info'?'log':level,arguments);try{o.apply(console,arguments);}catch(e){}};});window.addEventListener('error',function(e){send('error',[e.message]);});})();</script>`;
@@ -48,6 +55,7 @@ function buildDoc(code: string, language: 'js' | 'jsx' | 'html', id: string): st
 
   if (language === 'jsx') {
     try {
+      const Babel = await loadBabel();
       const out = Babel.transform(code, {
         presets: [['react', { runtime: 'classic' }]],
         filename: 'exercice.jsx',
@@ -164,9 +172,12 @@ export function CodePlayground({
     setRunning(true);
     const current = codeRef.current;
     const lang = looksHtml(current) ? 'html' : language;
-    iframe.srcdoc = buildDoc(current, lang, id);
+    void buildDoc(current, lang, id).then((doc) => {
+      // On n'applique que si aucune exécution plus récente n'a pris le relais
+      if (idRef.current === id && iframeRef.current) iframeRef.current.srcdoc = doc;
+    });
     // Sécurité : on laisse le temps aux messages d'arriver
-    window.setTimeout(() => setRunning(false), 900);
+    window.setTimeout(() => setRunning(false), 1400);
   }, [language]);
 
   // Réception des messages de l'iframe
